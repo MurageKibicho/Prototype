@@ -719,19 +719,13 @@ byte *TimesThree(byte *newBuffer, int *XY)
 		result[i+0] = newBuffer[index];
 		result[i+1] = newBuffer[index];
 		result[i+2] = newBuffer[index];
-		/*result[i+0] = 255; //black-white test
-        result[i+1] = 255;
-        result[i+2] = 255;*/
 		index--;
 	}
 	return result;
 }
 
-void SingleFrameQuantizeDequantize(char *fileName, int *XY,int quantizationLevel)
+int SingleFrameQuantizeDequantize(char *fileName,char *name, int *XY,int quantizationLevel)
 {
-	char fileNameNew[1024];
-	snprintf(fileNameNew, sizeof(fileNameNew), "%s-COPY.pgm",fileName);
-	
 	byte *buffer = OpenFile(fileName, XY);
 	int dataLength = XY[0] * XY[1];
 	int numberOfMCUs = dataLength / 64;
@@ -739,14 +733,12 @@ void SingleFrameQuantizeDequantize(char *fileName, int *XY,int quantizationLevel
 	QuantizeDequantize(MCUs,numberOfMCUs,quantizationLevel);
 	byte *newBuffer = MCUsToNewBuffer(MCUs, XY, numberOfMCUs);
 	byte *planeData = TimesThree(newBuffer,XY);
-	SaveGrayFrame(newBuffer,XY[0],XY[1],fileNameNew);
-	char *name = "sample2.bmp";
 	GenerateBitmap(planeData, XY[1], XY[0],name);
 	free(planeData);
 	free(buffer);
 	free(newBuffer);
 	FreeMCUS(MCUs,XY);
-	
+	return 1;
 }
 
 int *FlattenMCUs(float **MCUs,int *XY, int numberOfMCUs)
@@ -800,7 +792,7 @@ int *SendMCUs(char *fileName, int quantizationLevel)
 	return newBuffer;	
 }
 
-int ReceiveMCUs(int *coefficients, char *fileName, int *XY, int quantizationLevel)
+int ReceiveMCUs(int *coefficients, char *fileName, char *fileNameNew, int *XY, int quantizationLevel)
 {
 	int dataLength = XY[0] * XY[1];
 	int numberOfMCUs = dataLength / 64;
@@ -813,20 +805,35 @@ int ReceiveMCUs(int *coefficients, char *fileName, int *XY, int quantizationLeve
 	}	
 	byte *newBuffer = MCUsToNewBuffer(MCUs, XY, numberOfMCUs);
 	byte *planeData = TimesThree(newBuffer,XY);
+	SaveGrayFrame(newBuffer,XY[0],XY[1],fileNameNew);
 	GenerateBitmap(planeData, XY[1], XY[0],fileName);
 	FreeMCUS(MCUs,XY);
 	free(newBuffer);
 	free(planeData);
-	return coefficients[400];
+	return 1;
 }
 
-/*void SingleFrameSendReceive(char *fileName, char *saveFile,int quantizationLevel)
+void SingleFrameSendReceive(char *fileName, char *saveFile,char *saveFile2,int quantizationLevel)
 {
 	int *toSend = SendMCUs(fileName,quantizationLevel);
 	int XY[]= {1080,1920};
-	ReceiveMCUs(toSend, saveFile, XY, quantizationLevel);
+	int two = 1;
+	ReceiveMCUs(toSend,saveFile,saveFile2, XY,two);
 	free(toSend);	
-	printf("%d",XY[0]);
+}
+
+//have to send XY, data
+/*
+int main()
+{
+	char *fileName = "frame-3.pgm";
+	char *saveFile = "sample2.bmp";
+	char *initialFile = "sample2.pgm";
+	char *newFile = "baba.bmp";
+	int quantizationLevel = 1;
+	int quantizationLevel2 = 10;
+	int XY[2] = {0,0};
+	SingleFrameSendReceive(fileName,saveFile,initialFile,quantizationLevel);
+	SingleFrameQuantizeDequantize(initialFile,newFile,XY, quantizationLevel2);
+	return 0;
 }*/
-
-

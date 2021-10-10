@@ -75,23 +75,13 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       questions = _questions;
     });
+    imageValueNotifier.saveInitialFile(questions);
+    print("Saved First file");
   }
   @override
   void initState() {
     super.initState();
-    imageValueNotifier.loadFile();
     _setup();
-  }
-
-  void ChangeImage(List<String> questions) {
-    if (imageValueNotifier.value != null) {
-      imageValueNotifier.saveFile(questions);
-      print("Here");
-    }
-    else
-      {
-        print("NUll");
-      }
   }
 
 
@@ -100,6 +90,27 @@ class _MyHomePageState extends State<MyHomePage> {
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
     final dataClass = Provider.of<Data>(context);
+    void ChangeImage(List<String> questions, int quantizationLevel) {
+      if(dataClass.availableImages[quantizationLevel] == 0)
+        {
+          imageValueNotifier.saveFile(questions,quantizationLevel);
+          print("Here");
+          dataClass.setAvailable(quantizationLevel);
+        }
+      else
+        {
+          imageValueNotifier.loadFile(quantizationLevel);
+          print("Avaliable");
+        }
+      /*if (imageValueNotifier.value != null) {
+        imageValueNotifier.saveFile(questions,quantizationLevel);
+        print("Here");
+      }
+      else
+      {
+        imageValueNotifier.saveFile(questions,quantizationLevel);
+      }*/
+    }
 
     return Scaffold(
       body: GestureDetector(
@@ -110,9 +121,6 @@ class _MyHomePageState extends State<MyHomePage> {
           child: ValueListenableBuilder<String?>(
             valueListenable: imageValueNotifier,
             builder: (BuildContext context, String ? result, Widget? child) {
-              if (result == null) {
-                return const CircularProgressIndicator();
-              }
               return Column(
                 children: <Widget>[
                   SafeArea(
@@ -121,29 +129,38 @@ class _MyHomePageState extends State<MyHomePage> {
                       color: CupertinoColors.black,
                       height: screenHeight / 2,
                       width: screenWidth,
-                      child: Image.file(
-                          File(result),
-                      ),
+                      child: (result == null) ?
+                      CircularProgressIndicator()
+                          :
+                          Image.file(
+                            File(result),
+                            ),
+
                     ),
                   ),
                   const Text("Tap image to reset"),
-                  Text("ImageSize "),
-                  TextButton(
-                    child: Text("Click Here : "),
-                    onPressed: (){print("NO ${int.parse(questions.elementAt(2073536))}");},//rotateClockwiseImage,
-                  ),
+                  Text("Quantization Level: ${dataClass.quantizationLevel}"),
               TextButton(
               onPressed: ()
               {
-                ChangeImage(questions);
+                //ChangeImage(questions, int.parse(dataClass.quantizationLevel));
               },
               child: const Text(
-              "Press Here",
+              "Press Here:",
               style: TextStyle(fontSize: 10),
               ),
-              )
-                  //CustomButton(opereshon: ChangeImage),
-
+              ),
+              Slider(
+                  value: dataClass.quantizationLevel.toDouble(),
+                  min: 0,
+                  max: 10,
+                  divisions:10,
+                  onChanged: (value)
+                  {
+                    dataClass.setQuantization(value);
+                    ChangeImage(questions, dataClass.quantizationLevel);
+                  }
+              ),
                 ],
               );
             },
@@ -182,9 +199,9 @@ class ImageValueNotifier extends ValueNotifier<String?> {
     value = initial;
   }
 
-  void loadFile() async
+  void loadFile(int quantization) async
   {
-    String filePath = await getFilePath();
+    String filePath = await getFilePath(quantization);
     File file = File(filePath);
     if(file.existsSync())
     {
@@ -193,11 +210,13 @@ class ImageValueNotifier extends ValueNotifier<String?> {
     }
   }
 
-  void saveFile(List<String> questions) async
+  void saveInitialFile(List<String> questions) async
   {
-    String path = await getFilePath();
+    int quantization = 1;
+    String bitmapPath = await getInitialPath(0,quantization);
+    String pgmPath = await getInitialPath(1,quantization);
     final FFIBridge _ffiBridge2 = FFIBridge();
-    int quantizationLevel = 1;
+    int quantizationLevel = quantization;
     Pointer<Int32> coefficients = calloc<Int32>(1080*1920);
     for(int i = 0; i < 1080*1920; i++)
     {
@@ -206,19 +225,46 @@ class ImageValueNotifier extends ValueNotifier<String?> {
     Pointer<Int32> XY = calloc<Int32>(2);
     XY[0] = 1080;
     XY[1] = 1920;
-    int result = _ffiBridge2.decodeFile(coefficients,path,XY,quantizationLevel);
-    print("Result : ${int.parse(questions.elementAt(2073536))}");
-    value = path;
+    int result = _ffiBridge2.decodeFile(coefficients,bitmapPath,pgmPath,XY,quantizationLevel);
+    value = bitmapPath;
   }
 
 
+  void saveFile(List<String> questions,int quantization) async
+  {
+    String bitmapPath = await getInitialPath(0,quantization);
+    String pgmPath = await getInitialPath(1,1);
+    final FFIBridge _ffiBridge2 = FFIBridge();
+    int quantizationLevel = quantization;
+    Pointer<Int32> XY = calloc<Int32>(2);
+    XY[0] = 1080;
+    XY[1] = 1920;
+    int result = _ffiBridge2.quantizeFile(pgmPath,bitmapPath, XY,quantizationLevel);
+    value = bitmapPath;
+  }
 }
 
-Future<String> getFilePath() async
+Future<String> getInitialPath(int type, int quantizationLevel) async
 {
   Directory documentsDirectory = await getApplicationDocumentsDirectory();
   String documentsPath = documentsDirectory.path;
-  String filePath = "${documentsPath}/sample.bmp";
+  late String filePath = " ";
+  if(type == 0)
+  {
+    filePath = "${documentsPath}/sample-${quantizationLevel}.bmp";
+  }
+  else
+    {
+      filePath = "${documentsPath}/sample-${quantizationLevel}.pgm";
+    }
+  return filePath;
+}
+
+Future<String> getFilePath(int quantizationLevel) async
+{
+  Directory documentsDirectory = await getApplicationDocumentsDirectory();
+  String documentsPath = documentsDirectory.path;
+  String filePath = "${documentsPath}/sample-${quantizationLevel}.bmp";
   return filePath;
 }
 

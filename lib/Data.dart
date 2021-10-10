@@ -4,16 +4,31 @@ import 'package:provider/provider.dart';
 
 class Data extends ChangeNotifier
 {
-  int _display = 0;
+  int _quantizationLevel = 1;
 
-  get display => _display;
-  set display(value){
-    _display = value;
+  List<int> _availableImages = List.filled(11, 0);
+
+  get quantizationLevel => _quantizationLevel;
+  set quantizationLevel(value){
+    _quantizationLevel = value;
     notifyListeners();
   }
 
-  void setDisplay(int result) {
-    display = result;
+  void setQuantization(double result)
+  {
+    quantizationLevel = result.ceil();
+    notifyListeners();
+  }
+
+  get availableImages => _availableImages;
+  set availableImages(value){
+    _availableImages = value;
+    notifyListeners();
+  }
+
+  void setAvailable(int index)
+  {
+    availableImages[index] = 1;
     notifyListeners();
   }
 
